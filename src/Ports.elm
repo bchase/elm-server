@@ -1,6 +1,6 @@
 port module Ports exposing (..)
 
-import Types exposing (Output)
+import Types exposing (Response)
 
 
-port exit : Output -> Cmd msg
+port respond : Response -> Cmd msg

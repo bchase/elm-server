@@ -22,16 +22,17 @@ import Maybe as M
   (<|)
 
 
-echo : Date -> Conn -> String
+echo : Date -> Conn -> Response
 echo date { req } =
-  S.join " "
-    [ toString date
-    , toString req.method
-    , req.pathname
-    ]
+  respondTxt 200
+    $ S.join " "
+      [ toString date
+      , toString req.method
+      , req.pathname
+      ]
 
 
-greet : Conn -> String
+greet : Conn -> Response
 greet { req } =
   let
     name =
@@ -40,16 +41,18 @@ greet { req } =
     msg =
       "Hello, " ++ (name req.queryParams) ++ "!"
   in
-    json [ ( "message", J.string msg ) ]
+    respondJson 200
+      $ json [ ( "message", J.string msg ) ]
 
 
-notFound : Conn -> String
+notFound : Conn -> Response
 notFound { req } =
-  S.join " "
-    [ "Not found: "
-    , toString req.method
-    , req.pathname
-    ]
+  respondTxt 404
+    $ S.join " "
+      [ "Not found: "
+      , toString req.method
+      , req.pathname
+      ]
 
 
 
@@ -84,13 +87,13 @@ update : Msg -> Conn -> ( Conn, Cmd Msg )
 update msg conn =
   case msg of
     Echo now ->
-      conn ! [ return <| echo now conn ]
+      conn ! [ respond <| echo now conn ]
 
     Greet ->
-      conn ! [ return <| greet conn ]
+      conn ! [ respond <| greet conn ]
 
     NotFound ->
-      conn ! [ return <| notFound conn ]
+      conn ! [ respond <| notFound conn ]
 
     Error err ->
       conn ! [ fail err ]
@@ -140,24 +143,14 @@ main =
 -- helpers
 
 
-return : String -> Cmd msg
-return =
-  Ports.exit << success
+respond : Response -> Cmd msg
+respond =
+  Ports.respond
 
 
 fail : String -> Cmd msg
-fail =
-  Ports.exit << failure
-
-
-success : String -> Output
-success =
-  Output True
-
-
-failure : String -> Output
-failure =
-  Output False
+fail err =
+  Ports.respond . respondJson 500 $ json [ ( "error", J.string err ) ]
 
 
 cmd : msg -> Cmd msg
@@ -170,6 +163,21 @@ cmd msg =
 json : List ( String, J.Value ) -> String
 json =
   J.encode 0 . J.object
+
+
+respondJson : Int -> String -> Response
+respondJson =
+  respondContentType "application/json"
+
+
+respondTxt : Int -> String -> Response
+respondTxt =
+  respondContentType "text/plain"
+
+
+respondContentType : String -> Int -> String -> Response
+respondContentType ct status body =
+  Response status [ ( "Content-Type", ct ) ] $ Just body
 
 
 mapOk : (a -> Msg) -> Result x a -> Msg
@@ -221,23 +229,3 @@ parseHttpMethod str =
 
     _ ->
       Err <| "Invalid HTTP method: `" ++ str ++ "`"
-
-
-
--- type Response fmt
---   = NoContent
---   | Response (PopulatedResponse fmt)
---
---
--- type alias PopulatedResponse fmt =
---   { status : HttpStatus
---   , headers : Headers
---   , body : fmt
---   }
---
---
--- type
---   HttpStatus
---   -- TODO Int?
---   = Ok200
---   | Accepted201

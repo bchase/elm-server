@@ -3,10 +3,10 @@ module Types exposing (..)
 import Dict exposing (Dict)
 
 
-type alias Output =
-  -- TODO rm after Response
-  { success : Bool
-  , payload : String
+type alias Response =
+  { status : Int
+  , headers : List ( String, String )
+  , body : Maybe String
   }
 
 

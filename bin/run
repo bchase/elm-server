@@ -37,13 +37,13 @@ const server = function(req, body, callback) {
   }
 
   const elm = Elm.Main.worker(buildConn(config, req))
-  elm.ports.exit.subscribe(callback)
+  elm.ports.respond.subscribe(callback)
 }
 
 
 
 // https://nodejs.org/en/docs/guides/anatomy-of-an-http-transaction/
-http.createServer((req, resp) => {
+http.createServer((req, response) => {
   const error = (err) => { console.error(err) } // TODO
 
   let body = []
@@ -52,20 +52,10 @@ http.createServer((req, resp) => {
     .on('data', (chunk) => { body.push(chunk) })
     .on('end', () => {
       body = Buffer.concat(body).toString()
-      resp.on('error', error)
-      server(req, body, ({success, payload}) => {
-        if (!success) {
-          error(payload)
-        } else {
-          const output = {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-            body: payload,
-          }
-
-          resp.writeHead(output.status, output.headers)
-          resp.end(output.body)
-        }
+      response.on('error', error)
+      server(req, body, (resp) => {
+        response.writeHead(resp.status, resp.headers)
+        response.end(resp.body)
       })
     })
 }).listen(port)
