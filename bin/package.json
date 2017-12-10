@@ -9,6 +9,8 @@
   "author": "Brad Chase",
   "license": "ISC",
   "dependencies": {
-    "lodash": "^4.17.4"
+    "lodash": "^4.17.4",
+    "query-string": "^5.0.1",
+    "url": "^0.11.0"
   }
 }
