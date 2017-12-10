@@ -3,15 +3,61 @@ module Types exposing (..)
 import Dict exposing (Dict)
 
 
-type alias Conn =
-  -- TODO replace Flags
-  { cfg : Config
-  , req : Request
-  , resp : Response
+type alias Output =
+  -- TODO rm after Response
+  { success : Bool
+  , payload : String
   }
 
 
+
+-- raw conn
+
+
+type alias RawConn =
+  { cfg : RawConfig
+  , req : RawRequest
+  }
+
+
+type alias RawConfig =
+  { env : String
+  }
+
+
+type alias RawRequest =
+  { headers : List ( String, String )
+  , method : String
+  , pathname : String
+  , queryParams : List ( String, String )
+  , body : Maybe String
+  }
+
+
+
+-- conn
+
+
+type alias ConnState state =
+  { cfg : Config
+  , req : Request
+  , state : state
+  }
+
+
+type alias Config =
+  { env : Env
+  }
+
+
+type Env
+  = Dev
+  | Test
+  | Prod
+
+
 type alias Request =
+  -- TODO
   -- { host :
   -- , port :
   -- , protocol :
@@ -19,42 +65,12 @@ type alias Request =
   -- , rawPath :
   -- , rawQueryString :
   -- }
-  { method : HttpMethod
-  , path : Path
-  , params : Params
+  { headers : Dict String String
+  , method : HttpMethod
+  , pathname : String
+  , queryParams : Dict String String
+  , body : Maybe String
   }
-
-
-type alias Path =
-  -- TODO List?
-  String
-
-
-type alias Params =
-  Dict String String
-
-
-type alias Headers =
-  Dict String String
-
-
-type Response fmt
-  = NoContent
-  | Response (PopulatedResponse fmt)
-
-
-type alias PopulatedResponse fmt =
-  { status : HttpStatus
-  , headers : Headers
-  , body : fmt
-  }
-
-
-type
-  HttpStatus
-  -- TODO Int?
-  = Ok200
-  | Accepted201
 
 
 type HttpMethod
@@ -66,51 +82,17 @@ type HttpMethod
   | HEAD
 
 
-type alias Config =
-  { env : Env
+emptyConn : Conn
+emptyConn =
+  ConnState emptyConfig emptyRequest ()
+
+
+emptyConfig : Config
+emptyConfig =
+  { env = Prod
   }
 
 
-type Env
-  = Dev
-  | Test_
-    -- TODO Test
-  | Prod
-
-
-
--- TODO DELETE/ADJUST OLD BELOW
-
-
-type alias Flags =
-  { mode : String
-  , ab : String
-  , input : String
-  }
-
-
-type alias Input =
-  { mode : Mode
-  , ab : AB
-  , input : String
-  }
-
-
-type alias Model =
-  Result Flags Input
-
-
-type Mode
-  = Run
-  | Test
-
-
-type AB
-  = A
-  | B
-
-
-type alias Output =
-  { success : Bool
-  , payload : String
-  }
+emptyRequest : Request
+emptyRequest =
+  Request Dict.empty GET "/" Dict.empty Nothing

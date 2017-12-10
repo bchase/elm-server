@@ -7,7 +7,7 @@ import Task
 import Json.Decode
 import Json.Encode as J
 import Ports
-import Types exposing (Flags, Input, Model, Mode(..), AB(..), Output)
+import Types exposing (Output)
 import String as S
 import List as L
 import Dict as D
@@ -205,80 +205,20 @@ parseHttpMethod str =
 
 
 
--- raw conn
-
-
-type alias RawConn =
-  { cfg : RawConfig
-  , req : RawRequest
-  }
-
-
-type alias RawConfig =
-  { env : String
-  }
-
-
-type alias RawRequest =
-  { headers : List ( String, String )
-  , method : String
-  , pathname : String
-  , queryParams : List ( String, String )
-  , body : Maybe String
-  }
-
-
-
--- conn
-
-
-type alias ConnState state =
-  { cfg : Config
-  , req : Request
-  , state : state
-  }
-
-
-type alias Config =
-  { env : Env
-  }
-
-
-type Env
-  = Dev
-  | Test
-  | Prod
-
-
-type alias Request =
-  { headers : Dict String String
-  , method : HttpMethod
-  , pathname : String
-  , queryParams : Dict String String
-  , body : Maybe String
-  }
-
-
-type HttpMethod
-  = GET
-  | POST
-  | PUT
-  | PATCH
-  | DELETE
-  | HEAD
-
-
-emptyConn : Conn
-emptyConn =
-  ConnState emptyConfig emptyRequest ()
-
-
-emptyConfig : Config
-emptyConfig =
-  { env = Prod
-  }
-
-
-emptyRequest : Request
-emptyRequest =
-  Request Dict.empty GET "/" Dict.empty Nothing
+-- type Response fmt
+--   = NoContent
+--   | Response (PopulatedResponse fmt)
+--
+--
+-- type alias PopulatedResponse fmt =
+--   { status : HttpStatus
+--   , headers : Headers
+--   , body : fmt
+--   }
+--
+--
+-- type
+--   HttpStatus
+--   -- TODO Int?
+--   = Ok200
+--   | Accepted201
