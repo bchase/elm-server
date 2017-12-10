@@ -1,21 +1,49 @@
 module Main exposing (..)
 
-import Platform exposing (programWithFlags)
+import Platform
 import Dict exposing (Dict)
 import Date exposing (Date)
 import Task
 import Json.Decode
-import Ports exposing (exit)
+import Json.Encode as J
+import Ports
 import Types exposing (Flags, Input, Model, Mode(..), AB(..), Output)
 import String as S
 import List as L
 import Dict as D
+import Maybe as M
+
+
+(.) =
+  (<<)
+
+
+($) =
+  (<|)
 
 
 echo : Date -> Conn -> String
 echo date { req } =
   S.join " "
     [ toString date
+    , toString req.method
+    , req.pathname
+    ]
+
+
+greet : Conn -> String
+greet { req } =
+  let
+    name =
+      M.withDefault "stranger" . D.get "name"
+  in
+    "Hello, " ++ (name req.queryParams) ++ "!"
+
+
+notFound : Conn -> String
+notFound { req } =
+  S.join " "
+    [ "Not found: "
     , toString req.method
     , req.pathname
     ]
@@ -30,21 +58,38 @@ type alias Conn =
 
 
 type Msg
-  = Start
-  | Now (Result String Date)
+  = Echo (Result String Date)
+  | Greet
+  | NotFound
+
+
+route : Request -> Cmd Msg
+route { method, pathname } =
+  case ( method, pathname ) of
+    ( GET, "/echo" ) ->
+      Task.attempt Echo Date.now
+
+    ( GET, "/greet" ) ->
+      cmd Greet
+
+    _ ->
+      cmd NotFound
 
 
 update : Msg -> Conn -> ( Conn, Cmd Msg )
 update msg conn =
   case msg of
-    Start ->
-      conn ! [ Task.attempt Now Date.now ]
-
-    Now (Ok now) ->
+    Echo (Ok now) ->
       conn ! [ return <| echo now conn ]
 
-    Now (Err err) ->
+    Echo (Err err) ->
       conn ! [ fail err ]
+
+    Greet ->
+      conn ! [ return <| greet conn ]
+
+    NotFound ->
+      conn ! [ return <| notFound conn ]
 
 
 main : Program RawConn Conn Msg
@@ -58,7 +103,7 @@ main =
           emptyConn ! [ fail err ]
 
         Ok conn ->
-          conn ! [ cmd Start ]
+          conn ! [ route conn.req ]
 
     buildConn : RawConn -> Result String Conn
     buildConn { cfg, req } =
@@ -80,7 +125,7 @@ main =
       in
         Result.map3 ConnState cfg_ req_ (Ok ())
   in
-    programWithFlags
+    Platform.programWithFlags
       { init = init
       , update = update
       , subscriptions = \_ -> Sub.none
@@ -93,12 +138,12 @@ main =
 
 return : String -> Cmd msg
 return =
-  exit << success
+  Ports.exit << success
 
 
 fail : String -> Cmd msg
 fail =
-  exit << failure
+  Ports.exit << failure
 
 
 success : String -> Output
