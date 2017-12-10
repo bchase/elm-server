@@ -82,9 +82,9 @@ type HttpMethod
   | HEAD
 
 
-emptyConn : Conn
-emptyConn =
-  ConnState emptyConfig emptyRequest ()
+emptyConn : s -> ConnState s
+emptyConn s =
+  ConnState emptyConfig emptyRequest s
 
 
 emptyConfig : Config

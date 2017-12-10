@@ -7,7 +7,7 @@ import Task
 import Json.Decode
 import Json.Encode as J
 import Ports
-import Types exposing (Output)
+import Types exposing (..)
 import String as S
 import List as L
 import Dict as D
@@ -36,8 +36,11 @@ greet { req } =
   let
     name =
       M.withDefault "stranger" . D.get "name"
+
+    msg =
+      "Hello, " ++ (name req.queryParams) ++ "!"
   in
-    "Hello, " ++ (name req.queryParams) ++ "!"
+    json [ ( "message", J.string msg ) ]
 
 
 notFound : Conn -> String
@@ -58,16 +61,17 @@ type alias Conn =
 
 
 type Msg
-  = Echo (Result String Date)
+  = Echo Date
   | Greet
   | NotFound
+  | Error String
 
 
 route : Request -> Cmd Msg
 route { method, pathname } =
   case ( method, pathname ) of
     ( GET, "/echo" ) ->
-      Task.attempt Echo Date.now
+      Task.attempt (mapOk Echo) Date.now
 
     ( GET, "/greet" ) ->
       cmd Greet
@@ -79,17 +83,17 @@ route { method, pathname } =
 update : Msg -> Conn -> ( Conn, Cmd Msg )
 update msg conn =
   case msg of
-    Echo (Ok now) ->
+    Echo now ->
       conn ! [ return <| echo now conn ]
-
-    Echo (Err err) ->
-      conn ! [ fail err ]
 
     Greet ->
       conn ! [ return <| greet conn ]
 
     NotFound ->
       conn ! [ return <| notFound conn ]
+
+    Error err ->
+      conn ! [ fail err ]
 
 
 main : Program RawConn Conn Msg
@@ -100,7 +104,7 @@ main =
       case buildConn raw of
         Err err ->
           -- TODO
-          emptyConn ! [ fail err ]
+          emptyConn () ! [ fail err ]
 
         Ok conn ->
           conn ! [ route conn.req ]
@@ -161,6 +165,21 @@ cmd msg =
   msg
     |> Task.succeed
     |> Task.perform identity
+
+
+json : List ( String, J.Value ) -> String
+json =
+  J.encode 0 . J.object
+
+
+mapOk : (a -> Msg) -> Result x a -> Msg
+mapOk msg r =
+  case r of
+    Ok a ->
+      msg a
+
+    Err err ->
+      Error $ toString err
 
 
 parseConfig : RawConfig -> Result String Config
