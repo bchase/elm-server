@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 
+const _ = require('lodash')
 const http = require('http')
+const url = require('url')
+const qs = require('query-string')
+
 const Elm  = require('./elm.js')
 
 
@@ -8,11 +12,28 @@ const port = 8080
 
 const config = { env: 'dev' }
 
-const server = function(req, callback) {
-  const buildConn = (cfg, req) => {
-    const { headers, method, url } = req
+// // url.parse("/hi?foo=bar&baz=boo#qux")
+// Url {
+//   protocol: null,
+//   slashes: null,
+//   auth: null,
+//   host: null,
+//   port: null,
+//   hostname: null,
+//   hash: '#qux',
+//   search: '?foo=bar&baz=boo',
+//   query: 'foo=bar&baz=boo',
+//   pathname: '/hi',
+//   path: '/hi?foo=bar&baz=boo',
+//   href: '/hi?foo=bar&baz=boo#qux' }
+const server = function(req, body, callback) {
+  const buildConn = (cfg, rawReq) => {
+    const { headers, method } = rawReq
+    const { pathname, query } = url.parse(rawReq.url)
 
-    return { mode: 'run', ab: 'a', input: url }
+    const req = { headers: _.toPairs(headers), method, pathname, queryParams: _.toPairs(qs.parse(query)), body }
+
+    return { cfg, req }
   }
 
   const elm = Elm.Main.worker(buildConn(config, req))
@@ -32,7 +53,7 @@ http.createServer((req, resp) => {
     .on('end', () => {
       body = Buffer.concat(body).toString()
       resp.on('error', error)
-      server(req, ({success, payload}) => {
+      server(req, body, ({success, payload}) => {
         if (!success) {
           error(payload)
         } else {

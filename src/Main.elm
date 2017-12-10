@@ -1,6 +1,7 @@
 module Main exposing (..)
 
 import Platform exposing (programWithFlags)
+import Dict exposing (Dict)
 import Task
 import Json.Decode
 import Ports exposing (exit)
@@ -11,8 +12,8 @@ import Types exposing (Flags, Input, Model, Mode(..), AB(..), Output)
 
 
 action : Conn -> String
-action _ =
-  "received input: " ++ "NOT YET"
+action { input } =
+  "received input: " ++ input
 
 
 
@@ -24,13 +25,46 @@ type Msg
 
 
 type alias RawConn =
-  { input : String
+  { cfg : RawConfig
+  , req : RawRequest
+  }
+
+
+type alias RawRequest =
+  { headers : List ( String, String )
+  , method : String
+  , pathname : String
+  , queryParams : List ( String, String )
+  , body : Maybe String
+  }
+
+
+type alias Request =
+  { headers : Dict String String
+  , method : HttpMethod
+  , pathname : String
+  , qsp : Maybe (Dict String String)
+  , body : Maybe String
+  }
+
+
+type HttpMethod
+  = GET
+
+
+type alias RawConfig =
+  { env : String
   }
 
 
 type alias Conn =
   { input : String
   }
+
+
+emptyConn : Conn
+emptyConn =
+  Conn ""
 
 
 update : Msg -> Conn -> ( Conn, Cmd Msg )
@@ -43,17 +77,24 @@ update msg conn =
 main : Program RawConn Conn Msg
 main =
   let
-    init : RawConn -> ( Conn, Cmd Msg )
-    init raw =
-      let
-        conn =
-          Conn raw.input
-      in
-        conn ! [ cmd Start ]
+    buildConn : RawConn -> Conn
+    buildConn { cfg, req } =
+      -- let
+      --   { headers, method, pathname, queryParams, body } =
+      --     req
+      -- in
+      --   { headers = Dict.fromList headers
+      --   , method
+      --   , pathname = pathname
+      --   , qsp =
+      --   , body
+      --   }
+      { input = req.pathname
+      }
   in
     programWithFlags
       { init =
-        init
+        \raw -> buildConn (Debug.log "raw" raw) ! [ cmd Start ]
         -- , update = parseInputAnd update
       , update = update
       , subscriptions = \_ -> Sub.none
