@@ -1,5 +1,4 @@
 #!/bin/zsh
 
 
-echo `pwd`
 elm make ../src/**/*.elm --output elm.js

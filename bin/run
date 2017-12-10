@@ -8,42 +8,32 @@ const qs = require('query-string')
 const Elm  = require('./elm.js')
 
 
-const port = 8080
+const port = process.argv[2] || "8080"
 
 const config = { env: 'dev' }
 
-// // url.parse("/hi?foo=bar&baz=boo#qux")
-// Url {
-//   protocol: null,
-//   slashes: null,
-//   auth: null,
-//   host: null,
-//   port: null,
-//   hostname: null,
-//   hash: '#qux',
-//   search: '?foo=bar&baz=boo',
-//   query: 'foo=bar&baz=boo',
-//   pathname: '/hi',
-//   path: '/hi?foo=bar&baz=boo',
-//   href: '/hi?foo=bar&baz=boo#qux' }
-const server = function(req, body, callback) {
+const server = function(cfg, req, body, callback) {
   const buildConn = (cfg, rawReq) => {
     const { headers, method } = rawReq
     const { pathname, query } = url.parse(rawReq.url)
 
-    const req = { headers: _.toPairs(headers), method, pathname, queryParams: _.toPairs(qs.parse(query)), body }
+    const req = {
+      headers: _.toPairs(headers),
+      queryParams: _.toPairs(qs.parse(query)),
+      method, pathname, body,
+    }
 
     return { cfg, req }
   }
 
-  const elm = Elm.Main.worker(buildConn(config, req))
+  const elm = Elm.Main.worker(buildConn(cfg, req))
   elm.ports.respond.subscribe(callback)
 }
 
 
 
 // https://nodejs.org/en/docs/guides/anatomy-of-an-http-transaction/
-http.createServer((req, response) => {
+http.createServer((req, resp) => {
   const error = (err) => { console.error(err) } // TODO
 
   let body = []
@@ -52,10 +42,10 @@ http.createServer((req, response) => {
     .on('data', (chunk) => { body.push(chunk) })
     .on('end', () => {
       body = Buffer.concat(body).toString()
-      response.on('error', error)
-      server(req, body, (resp) => {
-        response.writeHead(resp.status, resp.headers)
-        response.end(resp.body)
+      resp.on('error', error)
+      server(config, req, body, ({ status, headers, body }) => {
+        resp.writeHead(status, headers)
+        resp.end(body)
       })
     })
 }).listen(port)

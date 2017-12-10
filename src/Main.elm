@@ -16,10 +16,12 @@ import Maybe as M
 
 (.) =
   (<<)
+infixr 9 .
 
 
 ($) =
   (<|)
+infixr 0 $
 
 
 echo : Date -> Conn -> Response
@@ -87,13 +89,13 @@ update : Msg -> Conn -> ( Conn, Cmd Msg )
 update msg conn =
   case msg of
     Echo now ->
-      conn ! [ respond <| echo now conn ]
+      conn ! [ respond $ echo now conn ]
 
     Greet ->
-      conn ! [ respond <| greet conn ]
+      conn ! [ respond $ greet conn ]
 
     NotFound ->
-      conn ! [ respond <| notFound conn ]
+      conn ! [ respond $ notFound conn ]
 
     Error err ->
       conn ! [ fail err ]
@@ -124,7 +126,7 @@ main =
           }
 
         req_ =
-          Result.map mkReq <| parseHttpMethod req.method
+          Result.map mkReq $ parseHttpMethod req.method
 
         cfg_ =
           -- TODO fail sooner
@@ -194,16 +196,16 @@ parseConfig : RawConfig -> Result String Config
 parseConfig { env } =
   case S.toUpper env of
     "DEV" ->
-      Ok <| Config Dev
+      Ok $ Config Dev
 
     "TEST" ->
-      Ok <| Config Test
+      Ok $ Config Test
 
     "PROD" ->
-      Ok <| Config Prod
+      Ok $ Config Prod
 
     _ ->
-      Err <| "Invalid Env: `" ++ env ++ "`"
+      Err $ "Invalid Env: `" ++ env ++ "`"
 
 
 parseHttpMethod : String -> Result String HttpMethod
@@ -228,4 +230,4 @@ parseHttpMethod str =
       Ok HEAD
 
     _ ->
-      Err <| "Invalid HTTP method: `" ++ str ++ "`"
+      Err $ "Invalid HTTP method: `" ++ str ++ "`"
