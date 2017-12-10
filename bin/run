@@ -1,0 +1,46 @@
+#!/usr/bin/env node
+
+const http = require('http')
+const Elm  = require('./elm.js')
+
+
+const port = 8080
+
+const config = { env: 'dev' }
+
+const server = function(req, callback) {
+  const buildConn = (cfg, req) => {
+    const { headers, method, url } = req
+
+    return { mode: 'run', ab: 'a', input: url }
+  }
+
+  const elm = Elm.Main.worker(buildConn(config, req))
+  elm.ports.exit.subscribe(callback)
+}
+
+
+
+// https://nodejs.org/en/docs/guides/anatomy-of-an-http-transaction/
+http.createServer((req, resp) => {
+  const error = (err) => { console.error(err) } // TODO
+
+  let body = []
+  req
+    .on('error', error)
+    .on('data', (chunk) => { body.push(chunk) })
+    .on('end', () => {
+      body = Buffer.concat(body).toString()
+      resp.on('error', error)
+      server(req, ({success, payload}) => {
+        const output = {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+        }
+
+        resp.writeHead(output.status, output.headers)
+        resp.end(output.body)
+      })
+    })
+}).listen(port)
