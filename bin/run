@@ -33,14 +33,18 @@ http.createServer((req, resp) => {
       body = Buffer.concat(body).toString()
       resp.on('error', error)
       server(req, ({success, payload}) => {
-        const output = {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-          body: payload,
-        }
+        if (!success) {
+          error(payload)
+        } else {
+          const output = {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+          }
 
-        resp.writeHead(output.status, output.headers)
-        resp.end(output.body)
+          resp.writeHead(output.status, output.headers)
+          resp.end(output.body)
+        }
       })
     })
 }).listen(port)
