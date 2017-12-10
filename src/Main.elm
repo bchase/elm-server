@@ -6,14 +6,17 @@ import Task
 import Json.Decode
 import Ports exposing (exit)
 import Types exposing (Flags, Input, Model, Mode(..), AB(..), Output)
+import String as S
+import List as L
+import Dict as D
 
 
 -- solution
 
 
 action : Conn -> String
-action { input } =
-  "received input: " ++ input
+action { req } =
+  "received input: " ++ req.pathname
 
 
 
@@ -43,9 +46,14 @@ type alias Request =
   { headers : Dict String String
   , method : HttpMethod
   , pathname : String
-  , qsp : Maybe (Dict String String)
+  , queryParams : Dict String String
   , body : Maybe String
   }
+
+
+emptyRequest : Request
+emptyRequest =
+  Request Dict.empty GET "/" Dict.empty Nothing
 
 
 type HttpMethod
@@ -57,52 +65,109 @@ type alias RawConfig =
   }
 
 
+type alias Config =
+  { env : Env
+  }
+
+
+type Env
+  = Dev
+  | Test
+  | Prod
+
+
 type alias Conn =
-  { input : String
+  { cfg : Config
+  , req : Request
+  }
+
+
+emptyConfig : Config
+emptyConfig =
+  { env = Prod
   }
 
 
 emptyConn : Conn
 emptyConn =
-  Conn ""
+  Conn emptyConfig emptyRequest
 
 
 update : Msg -> Conn -> ( Conn, Cmd Msg )
 update msg conn =
   case msg of
     Start ->
-      conn ! [ return <| action conn ]
+      conn ! [ return <| action (Debug.log "conn" conn) ]
 
 
 main : Program RawConn Conn Msg
 main =
   let
-    buildConn : RawConn -> Conn
+    init : RawConn -> ( Conn, Cmd Msg )
+    init raw =
+      case buildConn raw of
+        Err err ->
+          -- TODO
+          emptyConn ! [ fail err ]
+
+        Ok conn ->
+          conn ! [ cmd Start ]
+
+    buildConn : RawConn -> Result String Conn
     buildConn { cfg, req } =
-      -- let
-      --   { headers, method, pathname, queryParams, body } =
-      --     req
-      -- in
-      --   { headers = Dict.fromList headers
-      --   , method
-      --   , pathname = pathname
-      --   , qsp =
-      --   , body
-      --   }
-      { input = req.pathname
-      }
+      let
+        mkReq m =
+          { headers = Dict.fromList req.headers
+          , method = m
+          , pathname = req.pathname
+          , queryParams = Dict.fromList req.queryParams
+          , body = req.body
+          }
+
+        req_ =
+          Result.map mkReq <| parseHttpMethod req.method
+
+        cfg_ =
+          -- TODO fail sooner
+          parseConfig cfg
+      in
+        Result.map2 Conn cfg_ req_
   in
     programWithFlags
-      { init =
-        \raw -> buildConn (Debug.log "raw" raw) ! [ cmd Start ]
-        -- , update = parseInputAnd update
+      { init = init
       , update = update
       , subscriptions = \_ -> Sub.none
       }
 
 
+parseConfig : RawConfig -> Result String Config
+parseConfig { env } =
+  case S.toUpper env of
+    "DEV" ->
+      Ok <| Config Dev
 
--- default implentation for `main` & `update`
+    "TEST" ->
+      Ok <| Config Test
+
+    "PROD" ->
+      Ok <| Config Prod
+
+    _ ->
+      Err <| "Invalid Env: `" ++ env ++ "`"
+
+
+parseHttpMethod : String -> Result String HttpMethod
+parseHttpMethod str =
+  case S.toUpper str of
+    "GET" ->
+      Ok GET
+
+    _ ->
+      Err <| "Invalid HTTP method: `" ++ str ++ "`"
+
+
+
+-- helpers
 
 
 return : String -> Cmd msg
@@ -113,18 +178,6 @@ return =
 fail : String -> Cmd msg
 fail =
   exit << failure
-
-
-
--- private helpers
-
-
-type alias OuterUpdateFunc msg =
-  msg -> Model -> ( Model, Cmd msg )
-
-
-type alias InnerUpdateFunc msg =
-  msg -> Input -> ( (), Cmd msg )
 
 
 success : String -> Output
@@ -142,48 +195,3 @@ cmd msg =
   msg
     |> Task.succeed
     |> Task.perform identity
-
-
-parseInputAnd : InnerUpdateFunc msg -> OuterUpdateFunc msg
-parseInputAnd update msg model =
-  case ( msg, model ) of
-    ( _, Err flags ) ->
-      model ! [ fail <| "Unable to parse flags" ++ toString flags ]
-
-    ( msg, Ok input ) ->
-      let
-        cmd =
-          Tuple.second <| update msg input
-      in
-        model ! [ cmd ]
-
-
-parseFlags : Flags -> Model
-parseFlags ({ mode, ab, input } as flags) =
-  let
-    ab_ =
-      case String.toUpper ab of
-        "A" ->
-          Just A
-
-        "B" ->
-          Just B
-
-        _ ->
-          Nothing
-
-    mode_ =
-      case String.toUpper mode of
-        "RUN" ->
-          Just Run
-
-        "TEST" ->
-          Just Test
-
-        _ ->
-          Nothing
-
-    model =
-      Maybe.map3 (Input) mode_ ab_ (Just input)
-  in
-    Result.fromMaybe flags model
