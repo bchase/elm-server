@@ -2,6 +2,7 @@ module Main exposing (..)
 
 import Platform exposing (programWithFlags)
 import Dict exposing (Dict)
+import Date exposing (Date)
 import Task
 import Json.Decode
 import Ports exposing (exit)
@@ -11,93 +12,39 @@ import List as L
 import Dict as D
 
 
--- solution
-
-
-action : Conn -> String
-action { req } =
-  "received input: " ++ req.pathname
+echo : Date -> Conn -> String
+echo date { req } =
+  S.join " "
+    [ toString date
+    , toString req.method
+    , req.pathname
+    ]
 
 
 
 -- Msg / update / main
 
 
+type alias Conn =
+  ConnState ()
+
+
 type Msg
   = Start
-
-
-type alias RawConn =
-  { cfg : RawConfig
-  , req : RawRequest
-  }
-
-
-type alias RawRequest =
-  { headers : List ( String, String )
-  , method : String
-  , pathname : String
-  , queryParams : List ( String, String )
-  , body : Maybe String
-  }
-
-
-type alias Request =
-  { headers : Dict String String
-  , method : HttpMethod
-  , pathname : String
-  , queryParams : Dict String String
-  , body : Maybe String
-  }
-
-
-emptyRequest : Request
-emptyRequest =
-  Request Dict.empty GET "/" Dict.empty Nothing
-
-
-type HttpMethod
-  = GET
-
-
-type alias RawConfig =
-  { env : String
-  }
-
-
-type alias Config =
-  { env : Env
-  }
-
-
-type Env
-  = Dev
-  | Test
-  | Prod
-
-
-type alias Conn =
-  { cfg : Config
-  , req : Request
-  }
-
-
-emptyConfig : Config
-emptyConfig =
-  { env = Prod
-  }
-
-
-emptyConn : Conn
-emptyConn =
-  Conn emptyConfig emptyRequest
+  | Now (Result String Date)
 
 
 update : Msg -> Conn -> ( Conn, Cmd Msg )
 update msg conn =
   case msg of
     Start ->
-      conn ! [ return <| action (Debug.log "conn" conn) ]
+      conn ! [ Task.attempt Now Date.now ]
+
+    Now (Ok now) ->
+      conn ! [ return <| echo now conn ]
+
+    Now (Err err) ->
+      conn ! [ fail err ]
 
 
 main : Program RawConn Conn Msg
@@ -131,39 +78,13 @@ main =
           -- TODO fail sooner
           parseConfig cfg
       in
-        Result.map2 Conn cfg_ req_
+        Result.map3 ConnState cfg_ req_ (Ok ())
   in
     programWithFlags
       { init = init
       , update = update
       , subscriptions = \_ -> Sub.none
       }
-
-
-parseConfig : RawConfig -> Result String Config
-parseConfig { env } =
-  case S.toUpper env of
-    "DEV" ->
-      Ok <| Config Dev
-
-    "TEST" ->
-      Ok <| Config Test
-
-    "PROD" ->
-      Ok <| Config Prod
-
-    _ ->
-      Err <| "Invalid Env: `" ++ env ++ "`"
-
-
-parseHttpMethod : String -> Result String HttpMethod
-parseHttpMethod str =
-  case S.toUpper str of
-    "GET" ->
-      Ok GET
-
-    _ ->
-      Err <| "Invalid HTTP method: `" ++ str ++ "`"
 
 
 
@@ -195,3 +116,124 @@ cmd msg =
   msg
     |> Task.succeed
     |> Task.perform identity
+
+
+parseConfig : RawConfig -> Result String Config
+parseConfig { env } =
+  case S.toUpper env of
+    "DEV" ->
+      Ok <| Config Dev
+
+    "TEST" ->
+      Ok <| Config Test
+
+    "PROD" ->
+      Ok <| Config Prod
+
+    _ ->
+      Err <| "Invalid Env: `" ++ env ++ "`"
+
+
+parseHttpMethod : String -> Result String HttpMethod
+parseHttpMethod str =
+  case S.toUpper str of
+    "GET" ->
+      Ok GET
+
+    "POST" ->
+      Ok POST
+
+    "PUT" ->
+      Ok PUT
+
+    "PATCH" ->
+      Ok PATCH
+
+    "DELETE" ->
+      Ok DELETE
+
+    "HEAD" ->
+      Ok HEAD
+
+    _ ->
+      Err <| "Invalid HTTP method: `" ++ str ++ "`"
+
+
+
+-- raw conn
+
+
+type alias RawConn =
+  { cfg : RawConfig
+  , req : RawRequest
+  }
+
+
+type alias RawConfig =
+  { env : String
+  }
+
+
+type alias RawRequest =
+  { headers : List ( String, String )
+  , method : String
+  , pathname : String
+  , queryParams : List ( String, String )
+  , body : Maybe String
+  }
+
+
+
+-- conn
+
+
+type alias ConnState state =
+  { cfg : Config
+  , req : Request
+  , state : state
+  }
+
+
+type alias Config =
+  { env : Env
+  }
+
+
+type Env
+  = Dev
+  | Test
+  | Prod
+
+
+type alias Request =
+  { headers : Dict String String
+  , method : HttpMethod
+  , pathname : String
+  , queryParams : Dict String String
+  , body : Maybe String
+  }
+
+
+type HttpMethod
+  = GET
+  | POST
+  | PUT
+  | PATCH
+  | DELETE
+  | HEAD
+
+
+emptyConn : Conn
+emptyConn =
+  ConnState emptyConfig emptyRequest ()
+
+
+emptyConfig : Config
+emptyConfig =
+  { env = Prod
+  }
+
+
+emptyRequest : Request
+emptyRequest =
+  Request Dict.empty GET "/" Dict.empty Nothing
